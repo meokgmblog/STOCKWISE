@@ -79,47 +79,62 @@ def fetch_upstox_master_instruments():
         raise RuntimeError(f"Master file download error: {str(e)}")
 
 def resolve_stock_instruments(master_df, symbol):
-    """Dynamically resolves Equity spot key, Futures key, and Option chains for any stock."""
+    """
+    Dynamically resolves Spot key, Futures key, and Option chains for stocks and indices.
+    Handles Upstox naming conventions (e.g., LAURUSLABS-EQ, NSE_EQ segment).
+    """
     key_col = "instrument_key" if "instrument_key" in master_df.columns else "instrument_token"
     sym_col = "trading_symbol" if "trading_symbol" in master_df.columns else "tradingsymbol"
     type_col = "instrument_type" if "instrument_type" in master_df.columns else "segment"
     name_col = "name" if "name" in master_df.columns else ("asset_symbol" if "asset_symbol" in master_df.columns else sym_col)
     strike_col = "strike" if "strike" in master_df.columns else "strike_price"
 
-    # 1. Spot Key Resolution
-    spot_mask = (master_df[sym_col].astype(str).str.upper() == symbol) & (master_df[type_col].astype(str).str.upper() == "EQ")
+    clean_symbol = symbol.strip().upper()
+
+    # 1. Spot Key Resolution (Handles Stocks like LAURUSLABS-EQ and Indices like NIFTY 50)
+    spot_mask = (
+        (master_df[sym_col].astype(str).str.upper() == clean_symbol) |
+        (master_df[sym_col].astype(str).str.upper() == f"{clean_symbol}-EQ") |
+        (master_df[name_col].astype(str).str.upper() == clean_symbol)
+    ) & (
+        master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+    )
+
     spot_rows = master_df[spot_mask]
-    
+
     if spot_rows.empty:
-        # Fallback search by asset name if symbol mapping differs
-        spot_rows = master_df[(master_df[name_col].astype(str).str.upper() == symbol) & (master_df[type_col].astype(str).str.upper() == "EQ")]
-        
+        # Broader fallback search across trading symbol prefix
+        spot_rows = master_df[
+            master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol) &
+            master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+        ]
+
     if spot_rows.empty:
-        raise RuntimeError(f"Could not find Equity Spot instrument for symbol '{symbol}'. Ensure it is a valid F&O stock.")
-        
+        raise RuntimeError(f"Could not find Equity Spot instrument for '{clean_symbol}'. Check symbol spelling or master mapping.")
+
     spot_key = spot_rows.iloc[0][key_col]
 
     # 2. Options Resolution
     opts_mask = (
-        (master_df[name_col].astype(str).str.upper() == symbol) | 
-        (master_df[sym_col].astype(str).str.upper().str.startswith(symbol))
+        (master_df[name_col].astype(str).str.upper() == clean_symbol) |
+        (master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol))
     ) & master_df[type_col].astype(str).str.upper().str.contains("OPTSTK|OPTIDX|CE|PE", regex=True)
 
     opts = master_df[opts_mask].copy()
     if opts.empty:
-        raise RuntimeError(f"No options contracts found for {symbol}.")
+        raise RuntimeError(f"No active options contracts found for {clean_symbol}.")
 
     opts["expiry_dt"] = pd.to_datetime(opts["expiry"], errors="coerce")
     opts = opts.dropna(subset=["expiry_dt"])
     today = pd.Timestamp(datetime.now().date())
-    
+
     active_opts = opts[opts["expiry_dt"].dt.date >= today.date()].sort_values("expiry_dt")
     if active_opts.empty:
-        raise RuntimeError(f"No active unexpired options found for {symbol}.")
+        raise RuntimeError(f"No upcoming unexpired options contracts found for {clean_symbol}.")
 
     nearest_expiry = active_opts.iloc[0]["expiry_dt"]
     matching_opts = active_opts[active_opts["expiry_dt"] == nearest_expiry].copy()
-    
+
     return spot_key, matching_opts, key_col, sym_col, strike_col
 
 def get_intraday_candles(token, instrument_key):
