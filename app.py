@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Modern UI Styling Injection with Premium Animations & Glassmorphism
+# Custom Modern UI Styling Injection with Fixed Padding & High-Contrast Fonts
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
@@ -30,9 +30,21 @@ st.markdown("""
     /* Global Theme & Font Enhancements */
     .stApp {
         background: radial-gradient(circle at top right, #131722 0%, #0e1117 60%);
-        color: #d1d4dc;
+        color: #f0f6fc;
         font-family: 'Plus Jakarta Sans', sans-serif;
         animation: fadeInPage 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Eliminate excess top white space and streamline container padding */
+    .block-container {
+        padding-top: 1.2rem !important;
+        padding-bottom: 2rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+
+    header[data-testid="stHeader"] {
+        background: transparent !important;
     }
 
     @keyframes fadeInPage {
@@ -66,7 +78,7 @@ st.markdown("""
 
     [data-testid="stMetricLabel"] {
         font-size: 0.82rem !important;
-        color: #8b949e !important;
+        color: #c9d1d9 !important;
         text-transform: uppercase;
         font-weight: 700;
         letter-spacing: 0.08em;
@@ -80,7 +92,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
     }
 
-    /* Sidebar Customization */
+    /* Sidebar Customization & High Contrast Text Fixes */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #131722 0%, #0b0e14 100%);
         border-right: 1px solid rgba(42, 46, 57, 0.8);
@@ -88,7 +100,17 @@ st.markdown("""
     }
     
     section[data-testid="stSidebar"] .block-container {
-        padding-top: 2.5rem;
+        padding-top: 2rem !important;
+    }
+
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] div,
+    .stSelectbox label, 
+    .stSlider label {
+        color: #f0f6fc !important;
+        font-weight: 600 !important;
     }
 
     /* Headers */
