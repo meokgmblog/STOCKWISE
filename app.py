@@ -263,7 +263,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# UNIFIED SINGLE-CANVAS CHART RENDERER (CLEAN TRADINGVIEW STYLE)
+# UNIFIED SINGLE-CANVAS CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -286,10 +286,10 @@ def render_chart(df, symbol, expiry_str):
 
     fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Y2 Axis - Bottom Domain)
+    # 1. Position Builder Histogram Trace (Y2 Axis - Bottom Domain) - hoverinfo="none" removes upper date popup
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-    
+
     fig.add_trace(
         go.Bar(
             x=df["timestamp"],
@@ -299,7 +299,7 @@ def render_chart(df, symbol, expiry_str):
             marker_line_width=0,
             opacity=0.85,
             yaxis="y2",
-            hoverinfo="none", # Completely disables duplicate hover popup boxes
+            hoverinfo="none",
         )
     )
 
@@ -317,7 +317,7 @@ def render_chart(df, symbol, expiry_str):
             decreasing_line_color="#f23645",
             decreasing_fillcolor="#f23645",
             yaxis="y1",
-            hoverinfo="none", # Disables default plotly hover box to keep clean interface
+            hoverinfo="none",
         )
     )
 
@@ -336,7 +336,7 @@ def render_chart(df, symbol, expiry_str):
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        # Unified X-Axis placed at the bottom with clear date annotations
+        # Unified X-Axis placed at the bottom
         xaxis=dict(
             type="date",
             range=xaxis_range,
@@ -356,7 +356,12 @@ def render_chart(df, symbol, expiry_str):
             title="Price",
             domain=[0.28, 1.0],
             range=[y1_min, y1_max],
-            showspikes=False, # Removed spike lines crossing the price chart cleanly
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
             gridcolor="#2a2e39",
             side="right",
         ),
