@@ -18,30 +18,12 @@ import streamlit as st
 # ================================================================
 st.set_page_config(page_title="F&O Live Position Builder", layout="wide")
 
-# Custom CSS for Premium UI & Mobile Responsiveness
-st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    stButton>button {
-        width: 100%;
-    }
-    div[data-testid="stHorizontalBlock"] > div {
-        align-items: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 IST = ZoneInfo("Asia/Kolkata")
 MARKET_START = "09:00"
 MARKET_END = "15:45"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiJ2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
 
@@ -282,7 +264,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER (MOBILE & PREMIUM OPTIMIZED)
+# STACKED SUBPLOTS CHART RENDERER (MOBILE & DESKTOP OPTIMIZED)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -295,35 +277,19 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    # Create subplots with 2 rows sharing X-axis securely (prevents mobile zoom/autoscale merging issues)
+    # Create subplots with independent axes to avoid mobile zooming/autoscale overlap issues
     fig = make_subplots(
-        rows=2, cols=1,
+        rows=2,
+        cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.7, 0.3]
+        vertical_spacing=0.04,
+        row_heights=[0.72, 0.28]
     )
 
     # Custom date-time string formatting for the tooltip
     formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
 
-    # 1. Position Builder Histogram Trace (Row 2)
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            customdata=formatted_times,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.85,
-            hovertemplate="%{customdata}<extra></extra>",
-        ),
-        row=2, col=1
-    )
-
-    # 2. Candlestick Price Trace (Row 1)
+    # 1. Candlestick Price Trace (Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -342,25 +308,44 @@ def render_chart(df, symbol, expiry_str):
         row=1, col=1
     )
 
+    # 2. Position Builder Histogram Trace (Row 2)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            customdata=formatted_times,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.85,
+            hovertemplate="%{customdata}<extra></extra>",
+        ),
+        row=2, col=1
+    )
+
     fig.update_layout(
         title=dict(
             text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
-            font=dict(size=13, color="#d1d4dc"),
+            font=dict(size=14, color="#d1d4dc"),
             x=0.01,
-            y=0.97,
+            y=0.98,
         ),
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=520,
-        margin=dict(l=10, r=10, t=40, b=20),
+        height=500,
+        margin=dict(l=10, r=10, t=45, b=20),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
     )
 
-    # X-Axis configuration (Row 2 bottom)
+    # Shared X-Axis Configuration with Crosshairs
     fig.update_xaxes(
+        type="date",
         range=xaxis_range,
         showspikes=True,
         spikemode="across",
@@ -374,16 +359,9 @@ def render_chart(df, symbol, expiry_str):
         row=2, col=1
     )
 
-    fig.update_xaxes(
-        showticklabels=False,
-        gridcolor="#2a2e39",
-        row=1, col=1
-    )
-
-    # Primary Y-Axis (Candlesticks Upper Pane)
+    # Primary Y-Axis (Candlesticks Upper Panel)
     fig.update_yaxes(
-        title="Price",
-        side="right",
+        title_text="Price",
         showspikes=True,
         spikemode="across",
         spikesnap="cursor",
@@ -391,25 +369,27 @@ def render_chart(df, symbol, expiry_str):
         spikethickness=1,
         spikedash="dash",
         gridcolor="#2a2e39",
+        side="right",
         row=1, col=1
     )
 
-    # Secondary Y-Axis (Histogram Lower Pane)
+    # Secondary Y-Axis (Histogram Lower Panel)
     fig.update_yaxes(
-        title="",
+        title_text="",
         range=[-110, 480],
         showgrid=False,
         showticklabels=False,
         zeroline=True,
         zerolinecolor="#363a45",
         zerolinewidth=1,
+        side="right",
         row=2, col=1
     )
 
     config = {
         "scrollZoom": True,
         "displayModeBar": True,
-        "modeBarButtonsToAdd": ["pan2d"],
+        "modeBarButtonsToAdd": ["pan2d", "zoom2d"],
         "displaylogo": False,
         "responsive": True,
     }
