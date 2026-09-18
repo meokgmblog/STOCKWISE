@@ -263,7 +263,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# UNIFIED SINGLE-CANVAS CHART RENDERER (TRADINGVIEW STYLE)
+# UNIFIED SINGLE-CANVAS CHART RENDERER (TRADINGVIEW DEFAULT STYLE)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -305,7 +305,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. TradingView Style Regular Candlestick Price Trace (Y1 Axis - Upper Domain)
+    # 2. TradingView Standard Solid Candlestick Price Trace (Y1 Axis - Upper Domain)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -318,8 +318,6 @@ def render_chart(df, symbol, expiry_str):
             increasing_fillcolor="#089981",
             decreasing_line_color="#f23645",
             decreasing_fillcolor="#f23645",
-            line=dict(width=1),
-            whiskerwidth=1,
             yaxis="y1",
             hoverinfo="none",
         )
