@@ -436,7 +436,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis) - Bold Solid TradingView Style Candles
+    # 2. Candlestick Price Trace (Y1 Axis) - Regular Solid Filled Candles
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -446,11 +446,11 @@ def render_chart(df, symbol, expiry_str):
             close=df["close"],
             name=symbol,
             increasing=dict(
-                line=dict(color="#089981", width=3),
+                line=dict(color="#089981", width=1),
                 fillcolor="#089981"
             ),
             decreasing=dict(
-                line=dict(color="#f23645", width=3),
+                line=dict(color="#f23645", width=1),
                 fillcolor="#f23645"
             ),
             whiskerwidth=1,
