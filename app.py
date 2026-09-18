@@ -323,7 +323,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# SUBPLOTS CHART RENDERER (ZOOM-COMPATIBLE)
+# STACKED SUBPLOTS CHART RENDERER (Robust to Zooming)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -335,15 +335,15 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    # Use make_subplots with 2 stacked rows sharing the X-axis to allow independent Y scaling and robust zooming
+    # Create stacked subplots sharing X-axis securely
     fig = make_subplots(
         rows=2, cols=1,
         shared_xaxes=True,
-        row_heights=[0.72, 0.28],
-        vertical_spacing=0.03
+        vertical_spacing=0.03,
+        row_heights=[0.75, 0.25]
     )
 
-    # 1. Regular Candlestick Trace (Row 1)
+    # 1. Candlestick Price Trace (Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -352,10 +352,11 @@ def render_chart(df, symbol, expiry_str):
             low=df["low"],
             close=df["close"],
             name=symbol,
-            increasing_line_color="#089981",
             increasing_fillcolor="#089981",
-            decreasing_line_color="#f23645",
+            increasing_line_color="#089981",
             decreasing_fillcolor="#f23645",
+            decreasing_line_color="#f23645",
+            whiskerwidth=0.4,
             hoverinfo="none",
         ),
         row=1, col=1
@@ -390,50 +391,53 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#161b22",
         plot_bgcolor="#161b22",
-        height=500,
-        margin=dict(l=20, r=20, t=45, b=30),
+        height=520,
+        margin=dict(l=20, r=20, t=45, b=40),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        xaxis=dict(
-            type="date",
-            range=xaxis_range,
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-            rangeslider=dict(visible=False),
-        ),
-        xaxis2=dict(
-            type="date",
-            range=xaxis_range,
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#ffffff",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#2a2e39",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-        ),
-        yaxis=dict(
-            title="Price",
-            side="right",
-            gridcolor="#2a2e39",
-        ),
-        yaxis2=dict(
-            title="",
-            range=[-110, 110],
-            showgrid=False,
-            showticklabels=False,
-            zeroline=True,
-            zerolinecolor="#363a45",
-            zerolinewidth=1,
-        ),
+    )
+
+    # Configure X Axes for both subplots
+    fig.update_xaxes(
+        type="date",
+        range=xaxis_range,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        rangeslider=dict(visible=False),
+        row=2, col=1
+    )
+    fig.update_xaxes(
+        showticklabels=False,
+        row=1, col=1
+    )
+
+    # Configure Y Axes
+    fig.update_yaxes(
+        title="Price",
+        side="right",
+        showspikes=True,
+        spikecolor="#ffffff",
+        spikethickness=1,
+        gridcolor="#2a2e39",
+        row=1, col=1
+    )
+    fig.update_yaxes(
+        title="",
+        side="right",
+        range=[-110, 110],
+        showgrid=False,
+        showticklabels=False,
+        zeroline=True,
+        zerolinecolor="#363a45",
+        zerolinewidth=1,
+        row=2, col=1
     )
 
     config = {
