@@ -436,7 +436,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis) - TradingView Default Candle Aesthetic
+    # 2. Candlestick Price Trace (Y1 Axis) - Bold Solid TradingView Style Candles
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -446,14 +446,14 @@ def render_chart(df, symbol, expiry_str):
             close=df["close"],
             name=symbol,
             increasing=dict(
-                line=dict(color="#089981", width=1),
+                line=dict(color="#089981", width=3),
                 fillcolor="#089981"
             ),
             decreasing=dict(
-                line=dict(color="#f23645", width=1),
+                line=dict(color="#f23645", width=3),
                 fillcolor="#f23645"
             ),
-            whiskerwidth=0.8,
+            whiskerwidth=1,
             yaxis="y1",
             hoverinfo="none",  # Hides candlestick OHLC values from tooltip
         )
