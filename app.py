@@ -1,5 +1,6 @@
 import gzip
 import io
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -11,27 +12,111 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ================================================================
 # CONFIGURATION & PAGE SETUP
 # ================================================================
-st.set_page_config(page_title="F&O Live Position Builder", layout="wide")
+st.set_page_config(
+    page_title="F&O Live Position Builder", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom Premium Dark Theme CSS Styling
+st.markdown("""
+    <style>
+    /* Main Background & Font */
+    .stApp {
+        background-color: #0b0e14;
+        color: #d1d4dc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #131722;
+        border-right: 1px solid #2a2e39;
+    }
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 2rem;
+    }
+
+    /* Metric & Headers */
+    h1, h2, h3 {
+        color: #f8f9fa !important;
+        font-weight: 600;
+    }
+    
+    /* Inputs & Selectboxes */
+    .stSelectbox div[data-baseweb="select"] {
+        background-color: #1e222d;
+        border-color: #2a2e39;
+        color: #d1d4dc;
+    }
+    
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 IST = ZoneInfo("Asia/Kolkata")
-MARKET_START = "09:15"
-MARKET_END = "15:30"
+MARKET_START = "09:00"
+MARKET_END = "15:45"
 INTERVAL = 3
+
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+
+MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
+
+@st.cache_data(ttl=3600)
+def load_fno_symbols():
+    symbols = []
+    github_urls = [
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20ALL%20LIST.txt",
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO_ALL_LIST.txt",
+        "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20all%20list.txt"
+    ]
+    
+    for url in github_urls:
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200 and res.text.strip():
+                lines = res.text.splitlines()
+                symbols = [line.strip().upper() for line in lines if line.strip()]
+                if len(symbols) > 5:
+                    break
+        except Exception:
+            continue
+
+    if not symbols:
+        possible_filenames = ["FNO ALL LIST.txt", "FNO_ALL_LIST.txt", "FNO all list.txt", "fno_all_list.txt"]
+        for fname in possible_filenames:
+            if os.path.exists(fname):
+                try:
+                    with open(fname, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
+                        symbols = [line.strip().upper() for line in lines if line.strip()]
+                        if len(symbols) > 5:
+                            break
+                except Exception:
+                    continue
+
+    return sorted(list(set(MAJOR_INDICES + symbols)))
+
+fno_symbol_list = load_fno_symbols()
 
 # Sidebar Controls
 st.sidebar.title("⚙️ Controls & Parameters")
-ACCESS_TOKEN = st.sidebar.text_input(
-    "Upstox Access Token",
-    value="eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI6M0FZSEUiLCJqdGkiOiI6YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU",
-    type="password"
-)
 
-SYMBOL_INPUT = st.sidebar.text_input("F&O Symbol", value="LAURUSLABS").strip().upper()
+default_index = fno_symbol_list.index("NIFTY") if "NIFTY" in fno_symbol_list else 0
+SYMBOL_INPUT = st.sidebar.selectbox(
+    "F&O Symbol",
+    options=fno_symbol_list,
+    index=default_index
+).strip().upper()
+
 NUM_STRIKES_BOUND = st.sidebar.slider("Strikes Range (± ATM)", min_value=2, max_value=12, value=2)
 
 st.title(f"📈 {SYMBOL_INPUT} - Live 3-Minute Position Builder")
@@ -63,26 +148,38 @@ def upstox_get(url, token, params=None):
 
 @st.cache_data(ttl=3600)
 def fetch_upstox_master_instruments():
-    """Downloads and caches the NSE instrument master file."""
-    url = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.csv.gz"
+    nse_url = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.csv.gz"
+    bse_url = "https://assets.upstox.com/market-quote/instruments/exchange/BSE.csv.gz"
     try:
-        res = requests.get(url, timeout=20)
-        if res.status_code != 200:
-            raise Exception(f"HTTP {res.status_code} while fetching master csv.")
+        df_nse = pd.DataFrame()
+        df_bse = pd.DataFrame()
 
-        with gzip.open(io.BytesIO(res.content), "rt") as f:
-            df = pd.read_csv(f)
+        try:
+            res_nse = requests.get(nse_url, timeout=20)
+            if res_nse.status_code == 200:
+                with gzip.open(io.BytesIO(res_nse.content), "rt") as f:
+                    df_nse = pd.read_csv(f)
+        except Exception:
+            pass
 
+        try:
+            res_bse = requests.get(bse_url, timeout=20)
+            if res_bse.status_code == 200:
+                with gzip.open(io.BytesIO(res_bse.content), "rt") as f:
+                    df_bse = pd.read_csv(f)
+        except Exception:
+            pass
+
+        if df_nse.empty and df_bse.empty:
+            raise Exception("Failed to fetch master csv files for NSE and BSE.")
+
+        df = pd.concat([df_nse, df_bse], ignore_index=True)
         df.columns = [c.lower() for c in df.columns]
         return df
     except Exception as e:
         raise RuntimeError(f"Master file download error: {str(e)}")
 
 def resolve_stock_instruments(master_df, symbol):
-    """
-    Dynamically resolves Spot key, Futures key, and Option chains for stocks and indices.
-    Handles Upstox naming conventions (e.g., LAURUSLABS-EQ, NSE_EQ segment).
-    """
     key_col = "instrument_key" if "instrument_key" in master_df.columns else "instrument_token"
     sym_col = "trading_symbol" if "trading_symbol" in master_df.columns else "tradingsymbol"
     type_col = "instrument_type" if "instrument_type" in master_df.columns else "segment"
@@ -91,30 +188,27 @@ def resolve_stock_instruments(master_df, symbol):
 
     clean_symbol = symbol.strip().upper()
 
-    # 1. Spot Key Resolution (Handles Stocks like LAURUSLABS-EQ and Indices like NIFTY 50)
     spot_mask = (
         (master_df[sym_col].astype(str).str.upper() == clean_symbol) |
         (master_df[sym_col].astype(str).str.upper() == f"{clean_symbol}-EQ") |
         (master_df[name_col].astype(str).str.upper() == clean_symbol)
     ) & (
-        master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+        master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ|BSE_INDEX", regex=True)
     )
 
     spot_rows = master_df[spot_mask]
 
     if spot_rows.empty:
-        # Broader fallback search across trading symbol prefix
         spot_rows = master_df[
             master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol) &
-            master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ", regex=True)
+            master_df[type_col].astype(str).str.upper().str.contains("EQ|EQUITY|INDEX|NSE_EQ|BSE_INDEX", regex=True)
         ]
 
     if spot_rows.empty:
-        raise RuntimeError(f"Could not find Equity Spot instrument for '{clean_symbol}'. Check symbol spelling or master mapping.")
+        raise RuntimeError(f"Could not find Equity Spot instrument for '{clean_symbol}'.")
 
     spot_key = spot_rows.iloc[0][key_col]
 
-    # 2. Options Resolution
     opts_mask = (
         (master_df[name_col].astype(str).str.upper() == clean_symbol) |
         (master_df[sym_col].astype(str).str.upper().str.startswith(clean_symbol))
@@ -138,7 +232,6 @@ def resolve_stock_instruments(master_df, symbol):
     return spot_key, matching_opts, key_col, sym_col, strike_col
 
 def get_intraday_candles(token, instrument_key):
-    """Fetches intraday 3-minute candles for any instrument key."""
     if not instrument_key:
         return pd.DataFrame()
 
@@ -214,25 +307,29 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# PLOTLY CHART RENDERER
+# STACKED SUBPLOTS CHART RENDERER (TradingView Mobile Optimized)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
+    # Fixed intraday range from 09:00 to 15:45 for the current session date
+    current_date = df["timestamp"].dt.date.iloc[-1]
+    xaxis_range = [
+        pd.Timestamp(f"{current_date} {MARKET_START}:00"),
+        pd.Timestamp(f"{current_date} {MARKET_END}:00")
+    ]
+
+    # Create cleanly partitioned subplots (Row 1: Candlestick, Row 2: Position Builder Histogram)
     fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.68, 0.32],
-        subplot_titles=(
-            f"{symbol} Spot | 3m | Last: {last_price:.2f} | Updated: {last_time} IST",
-            f"POSITION BUILDER HISTOGRAM ({expiry_str})",
-        ),
+        rows=2, 
+        cols=1, 
+        shared_xaxes=True, 
+        vertical_spacing=0.03, 
+        row_heights=[0.72, 0.28]
     )
 
-    # 1. Candlestick Trace
+    # 1. Candlestick Price Trace (Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -246,60 +343,85 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="x+name",
+            hoverinfo="none",
         ),
-        row=1,
-        col=1,
+        row=1, col=1
     )
 
-    # 2. Position Builder Histogram
+    # 2. Position Builder Histogram Trace (Row 2)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
 
     fig.add_trace(
         go.Bar(
             x=df["timestamp"],
             y=values,
+            customdata=formatted_times,
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            hovertemplate="OI Scaled: %{y:.2f}<extra></extra>",
+            opacity=0.85,
+            hovertemplate="%{customdata}<extra></extra>",
         ),
-        row=2,
-        col=1,
+        row=2, col=1
     )
 
-    # Crosshair & Layout setup
     fig.update_layout(
+        title=dict(
+            text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
+            font=dict(size=13, color="#d1d4dc"),
+            x=0.01,
+            y=0.98,
+        ),
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=720,
-        margin=dict(l=15, r=15, t=35, b=15),
+        height=520,
+        margin=dict(l=10, r=10, t=40, b=30),
         showlegend=False,
         hovermode="x unified",
         dragmode="pan",
-        xaxis_rangeslider_visible=False,
-    )
-
-    fig.update_xaxes(
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#89929e",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-    )
-
-    fig.update_yaxes(gridcolor="#2a2e39", zerolinecolor="#363a45", row=1, col=1)
-    fig.update_yaxes(
-        range=[-110, 110],
-        gridcolor="#2a2e39",
-        zerolinecolor="#363a45",
-        row=2,
-        col=1,
+        xaxis=dict(
+            type="date",
+            range=xaxis_range,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#787b86",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#1e222d",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+            rangeslider=dict(visible=False),
+        ),
+        xaxis2=dict(
+            type="date",
+            range=xaxis_range,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#787b86",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#1e222d",
+            rangeslider=dict(visible=False),
+        ),
+        yaxis=dict(
+            title="Price",
+            side="right",
+            gridcolor="#1e222d",
+            zerolinecolor="#2a2e39",
+        ),
+        yaxis2=dict(
+            title="Net OI",
+            side="right",
+            range=[-110, 110],
+            gridcolor="#1e222d",
+            zeroline=True,
+            zerolinecolor="#363a45",
+            zerolinewidth=1,
+        )
     )
 
     config = {
@@ -307,6 +429,7 @@ def render_chart(df, symbol, expiry_str):
         "displayModeBar": True,
         "modeBarButtonsToAdd": ["pan2d"],
         "displaylogo": False,
+        "responsive": True
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
@@ -318,34 +441,28 @@ try:
     with st.spinner("Downloading market metadata..."):
         master_df = fetch_upstox_master_instruments()
 
-    # Step 1: Dynamically resolve spot instrument & nearest options chain
     spot_key, opts_df, key_col, sym_col, strike_col = resolve_stock_instruments(master_df, SYMBOL_INPUT)
 
-    # Step 2: Get intraday spot candles
     spot_df = filter_market_hours(get_intraday_candles(ACCESS_TOKEN, spot_key))
     if spot_df.empty:
-        st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot. Market may be closed or token expired.")
+        st.error(f"No intraday candle data returned for {SYMBOL_INPUT} spot.")
         st.stop()
 
     last_close = spot_df["close"].iloc[-1]
 
-    # Step 3: Dynamic Strike & Step Detection
     opts_df["strike_num"] = pd.to_numeric(opts_df[strike_col], errors="coerce")
     unique_strikes = sorted(opts_df["strike_num"].dropna().unique())
 
     if len(unique_strikes) > 1:
-        # Detect standard strike intervals dynamically
         strike_diffs = np.diff(unique_strikes)
         step_size = float(np.median(strike_diffs))
     else:
         step_size = 5.0
 
-    # Auto-calculate ATM Strike
     atm_strike = round(last_close / step_size) * step_size
     min_stk = atm_strike - (NUM_STRIKES_BOUND * step_size)
     max_stk = atm_strike + (NUM_STRIKES_BOUND * step_size)
 
-    # Filter ATM neighborhood options
     atm_opts = opts_df[(opts_df["strike_num"] >= min_stk) & (opts_df["strike_num"] <= max_stk)].copy()
     if atm_opts.empty:
         atm_opts = opts_df
@@ -353,7 +470,6 @@ try:
     ce_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("CE")]
     pe_opts = atm_opts[atm_opts[sym_col].astype(str).str.endswith("PE")]
 
-    # Step 4: Fetch Call/Put Open Interest Data concurrently
     with st.spinner(f"Scouting {len(ce_opts) + len(pe_opts)} contracts around ATM ({atm_strike})..."):
         ce_df = fetch_option_data_parallel(ACCESS_TOKEN, ce_opts, key_col)
         pe_df = fetch_option_data_parallel(ACCESS_TOKEN, pe_opts, key_col)
@@ -362,11 +478,9 @@ try:
         ce_df = ce_df.rename(columns={"sum_oi": "ce_oi"}).sort_values("timestamp").ffill().dropna()
         pe_df = pe_df.rename(columns={"sum_oi": "pe_oi"}).sort_values("timestamp").ffill().dropna()
 
-        # Build position histogram
         builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
         exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
         
-        # Render dynamic chart
         render_chart(builder_df, SYMBOL_INPUT, f"Expiry: {exp_date_str}")
     else:
         st.error("Failed to fetch concurrent open interest data for strikes.")
@@ -375,19 +489,19 @@ except Exception as err:
     st.error(f"Execution Error: {str(err)}")
 
 # ================================================================
-# AUTO-REFRESH TRIGGER (SYNCED TO 3-MINUTE CANDLE BOUNDARIES)
+# AUTO-REFRESH TRIGGER (Silent Clock-Aligned Rerun)
 # ================================================================
-now = datetime.now()
-seconds_past_3m = (now.minute % 3) * 60 + now.second
-ms_until_candle_close = max((180 - seconds_past_3m + 2) * 1000, 3000)
+now = datetime.now(IST)
+market_end_time = datetime.strptime(MARKET_END, "%H:%M").time()
 
-components.html(
-    f"""
-    <script>
-        setTimeout(function() {{
-            window.parent.postMessage({{type: 'streamlit:render'}}, '*');
-        }}, {ms_until_candle_close});
-    </script>
-    """,
-    height=0,
-)
+if now.time() >= market_end_time:
+    st.info("🔒 Market hours ended (Frozen after 3:45 PM). Data and chart are locked for the session.")
+else:
+    total_seconds = now.hour * 3600 + now.minute * 60 + now.second
+    market_start_seconds = 9 * 3600 + 0 * 60
+    remainder = (total_seconds - market_start_seconds) % 180
+    seconds_to_wait = 180 - remainder if remainder != 0 else 180
+    sleep_time = seconds_to_wait + 3
+
+    time.sleep(sleep_time)
+    st.rerun()
