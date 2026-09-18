@@ -22,49 +22,92 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Modern UI Styling Injection
+# Custom Modern UI Styling Injection with Premium Animations & Vibrant Colors
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
     /* Global Theme & Font Enhancements */
     .stApp {
-        background-color: #0e1117;
-        color: #d1d4dc;
+        background: radial-gradient(circle at 50% 0%, #111827 0%, #0b0f19 100%);
+        color: #f1f5f9;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        animation: fadeInPage 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     
-    /* Native Streamlit Metric Cards Customization */
+    @keyframes fadeInPage {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 10px rgba(8, 153, 129, 0.15); }
+        50% { box-shadow: 0 0 25px rgba(8, 153, 129, 0.4); }
+        100% { box-shadow: 0 0 10px rgba(8, 153, 129, 0.15); }
+    }
+    
+    /* Native Streamlit Metric Cards Customization with Glassmorphism */
     [data-testid="stMetric"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(12px);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: fadeInPage 0.6s ease-out;
+    }
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-5px);
+        border-color: rgba(8, 153, 129, 0.6);
+        box-shadow: 0 15px 35px -5px rgba(8, 153, 129, 0.25);
     }
     [data-testid="stMetricLabel"] {
-        font-size: 0.85rem !important;
-        color: #8b949e !important;
+        font-size: 0.8rem !important;
+        color: #94a3b8 !important;
         text-transform: uppercase;
-        font-weight: 600;
-        letter-spacing: 0.05em;
+        font-weight: 700;
+        letter-spacing: 0.08em;
     }
     [data-testid="stMetricValue"] {
-        font-size: 1.4rem !important;
-        font-weight: 700;
-        color: #f0f6fc !important;
+        font-size: 1.6rem !important;
+        font-weight: 800;
+        background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
-    /* Sidebar Customization */
+    /* Sidebar Customization with Sleek Dark Glass */
     section[data-testid="stSidebar"] {
-        background-color: #131722;
-        border-right: 1px solid #2a2e39;
+        background: linear-gradient(180deg, #0f172a 0%, #090d16 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
     }
     section[data-testid="stSidebar"] .block-container {
-        padding-top: 2rem;
+        padding-top: 2.5rem;
     }
 
-    /* Headers */
+    /* Headers with Accent Glow */
     h1, h2, h3 {
-        color: #f0f6fc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #f8fafc;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        letter-spacing: -0.02em;
+    }
+    
+    /* Custom Scrollbar for sleek UI */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #1e293b;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #334155;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -323,18 +366,18 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER
+# STACKED SUBPLOTS CHART RENDERER (TRADINGVIEW THEME)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Calculate price extremes to keep candles nicely padded
+    # Calculate price extremes to keep candles in the top ~75% of the canvas
     price_min = df["low"].min()
     price_max = df["high"].max()
     price_span = price_max - price_min if price_max != price_min else 1.0
 
-    y1_min = price_min - (price_span * 0.05)
+    y1_min = price_min - (price_span * 0.35)
     y1_max = price_max + (price_span * 0.05)
 
     # Fixed intraday range from 09:00 to 15:45 for the current session date
@@ -344,16 +387,13 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    fig = make_subplots(
-        rows=2, cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.75, 0.25]
-    )
+    fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Row 2)
+    # 1. Position Builder Histogram Trace (Y2 Axis - Shifted to Bottom)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    # Custom date-time string formatting for the tooltip
     formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
 
     fig.add_trace(
@@ -364,13 +404,13 @@ def render_chart(df, symbol, expiry_str):
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            opacity=0.7,
-            hovertemplate="%{customdata}<extra></extra>",
-        ),
-        row=2, col=1
+            opacity=0.8,
+            yaxis="y2",
+            hovertemplate="%{customdata}<extra></extra>",  # Shows ONLY the Date and Time
+        )
     )
 
-    # 2. Regular Candlestick Price Trace (Row 1)
+    # 2. Candlestick Price Trace (Y1 Axis) - Standard TradingView Aesthetic
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -384,82 +424,73 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="none",
-        ),
-        row=1, col=1
+            yaxis="y1",
+            hoverinfo="none",  # Hides candlestick OHLC values from tooltip
+        )
     )
 
     fig.update_layout(
         title=dict(
             text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
-            font=dict(size=14, color="#d1d4dc"),
+            font=dict(size=14, color="#f1f5f9", family="Plus Jakarta Sans"),
             x=0.01,
             y=0.98,
         ),
         template="plotly_dark",
-        paper_bgcolor="#161b22",
-        plot_bgcolor="#161b22",
+        paper_bgcolor="#0b0f19",
+        plot_bgcolor="#0f172a",
         height=480,
         margin=dict(l=20, r=20, t=45, b=40),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-    )
-
-    fig.update_xaxes(
-        type="date",
-        range=xaxis_range,
-        side="bottom",
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-        rangeslider=dict(visible=False),
-        row=2, col=1
-    )
-
-    fig.update_xaxes(
-        type="date",
-        range=xaxis_range,
-        showgrid=False,
-        showticklabels=False,
-        row=1, col=1
-    )
-
-    fig.update_yaxes(
-        title="Price",
-        range=[y1_min, y1_max],
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        side="right",
-        row=1, col=1
-    )
-
-    fig.update_yaxes(
-        title="",
-        range=[-110, 110],
-        showgrid=False,
-        showticklabels=False,
-        zeroline=True,
-        zerolinecolor="#363a45",
-        zerolinewidth=1,
-        row=2, col=1
+        # Unified X-Axis placed at the bottom below histogram with fixed session range
+        xaxis=dict(
+            type="date",
+            range=xaxis_range,
+            side="bottom",  # Forces time labels to the very bottom
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#38bdf8",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#1e293b",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+            rangeslider=dict(visible=False),
+        ),
+        # Primary Y-Axis (Candlesticks Upper Canvas)
+        yaxis=dict(
+            title="Price",
+            range=[y1_min, y1_max],
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#38bdf8",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#1e293b",
+            side="right",
+        ),
+        # Secondary Y-Axis (Histogram Floor)
+        yaxis2=dict(
+            title="",
+            overlaying="y",
+            side="left",
+            range=[-110, 480],
+            showgrid=False,
+            showticklabels=False,
+            zeroline=True,
+            zerolinecolor="#334155",
+            zerolinewidth=1.5,
+        ),
     )
 
     config = {
         "scrollZoom": True,
         "displayModeBar": True,
         "modeBarButtonsToAdd": ["pan2d"],
-        "modeBarButtonsToRemove": ["autoscale2d"],
+        "modeBarButtonsToRemove": ["autoscale2d"],  # Prevents autoscale layout breaking
         "displaylogo": False,
     }
 
