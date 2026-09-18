@@ -74,7 +74,7 @@ MARKET_START = "09:00"
 MARKET_END = "15:45"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIixlcmkiOiIxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
 
@@ -323,11 +323,19 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER (Robust to Zooming)
+# SUBPLOTS CHART RENDERER (FIXED ZOOM & REGULAR CANDLES)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
+
+    # Calculate price extremes
+    price_min = df["low"].min()
+    price_max = df["high"].max()
+    price_span = price_max - price_min if price_max != price_min else 1.0
+
+    y1_min = price_min - (price_span * 0.05)
+    y1_max = price_max + (price_span * 0.05)
 
     current_date = df["timestamp"].dt.date.iloc[-1]
     xaxis_range = [
@@ -335,15 +343,34 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    # Create stacked subplots sharing X-axis securely
+    # Create subplots with 2 rows: Top (Price) and Bottom (Position Builder Histogram)
     fig = make_subplots(
         rows=2, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
-        row_heights=[0.75, 0.25]
+        row_heights=[0.75, 0.25],
+        vertical_spacing=0.03
     )
 
-    # 1. Candlestick Price Trace (Row 1)
+    # 1. Position Builder Histogram Trace (Row 2)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
+
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            customdata=formatted_times,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.85,
+            hovertemplate="%{customdata}<extra></extra>",
+        ),
+        row=2, col=1
+    )
+
+    # 2. Regular Candlestick Price Trace (Row 1) - Standard Hover Enabled
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -357,28 +384,8 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
-            hoverinfo="none",
         ),
         row=1, col=1
-    )
-
-    # 2. Position Builder Histogram Trace (Row 2)
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            customdata=formatted_times,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.8,
-            hovertemplate="%{customdata}<extra></extra>",
-        ),
-        row=2, col=1
     )
 
     fig.update_layout(
@@ -392,13 +399,13 @@ def render_chart(df, symbol, expiry_str):
         paper_bgcolor="#161b22",
         plot_bgcolor="#161b22",
         height=520,
-        margin=dict(l=20, r=20, t=45, b=40),
+        margin=dict(l=20, r=20, t=45, b=30),
         showlegend=False,
-        hovermode="x",
+        hovermode="x unified",
         dragmode="pan",
     )
 
-    # Configure X Axes for both subplots
+    # Configure axes properly for subplots to prevent zoom clipping
     fig.update_xaxes(
         type="date",
         range=xaxis_range,
@@ -413,27 +420,29 @@ def render_chart(df, symbol, expiry_str):
         rangeslider=dict(visible=False),
         row=2, col=1
     )
+    
     fig.update_xaxes(
-        showticklabels=False,
-        row=1, col=1
-    )
-
-    # Configure Y Axes
-    fig.update_yaxes(
-        title="Price",
-        side="right",
-        showspikes=True,
-        spikecolor="#ffffff",
-        spikethickness=1,
+        type="date",
+        range=xaxis_range,
+        showgrid=True,
         gridcolor="#2a2e39",
         row=1, col=1
     )
+
     fig.update_yaxes(
-        title="",
+        title="Price",
+        range=[y1_min, y1_max],
+        gridcolor="#2a2e39",
         side="right",
+        row=1, col=1
+    )
+
+    fig.update_yaxes(
+        title="Net OI",
         range=[-110, 110],
-        showgrid=False,
-        showticklabels=False,
+        showgrid=True,
+        gridcolor="#2a2e39",
+        side="right",
         zeroline=True,
         zerolinecolor="#363a45",
         zerolinewidth=1,
