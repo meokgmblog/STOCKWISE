@@ -22,21 +22,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Modern UI Styling Injection with Premium Animations & Vibrant Colors
+# Custom Modern UI Styling Injection with Premium Animations & Glassmorphism
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
     /* Global Theme & Font Enhancements */
     .stApp {
-        background: radial-gradient(circle at 50% 0%, #111827 0%, #0b0f19 100%);
-        color: #f1f5f9;
+        background: radial-gradient(circle at top right, #131722 0%, #0e1117 60%);
+        color: #d1d4dc;
         font-family: 'Plus Jakarta Sans', sans-serif;
         animation: fadeInPage 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    
+
     @keyframes fadeInPage {
-        from { opacity: 0; transform: translateY(8px); }
+        from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
@@ -45,69 +45,73 @@ st.markdown("""
         50% { box-shadow: 0 0 25px rgba(8, 153, 129, 0.4); }
         100% { box-shadow: 0 0 10px rgba(8, 153, 129, 0.15); }
     }
-    
-    /* Native Streamlit Metric Cards Customization with Glassmorphism */
+
+    /* Native Streamlit Metric Cards Customization */
     [data-testid="stMetric"] {
-        background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(12px);
+        background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(31, 36, 44, 0.9) 100%);
+        border: 1px solid rgba(48, 54, 61, 0.8);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
         transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         animation: fadeInPage 0.6s ease-out;
     }
+    
     [data-testid="stMetric"]:hover {
-        transform: translateY(-5px);
-        border-color: rgba(8, 153, 129, 0.6);
-        box-shadow: 0 15px 35px -5px rgba(8, 153, 129, 0.25);
+        transform: translateY(-4px) scale(1.01);
+        border-color: #089981;
+        box-shadow: 0 12px 30px rgba(8, 153, 129, 0.25);
     }
+
     [data-testid="stMetricLabel"] {
-        font-size: 0.8rem !important;
-        color: #94a3b8 !important;
+        font-size: 0.82rem !important;
+        color: #8b949e !important;
         text-transform: uppercase;
         font-weight: 700;
         letter-spacing: 0.08em;
     }
+    
     [data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
+        font-size: 1.5rem !important;
         font-weight: 800;
-        background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+        background: linear-gradient(90deg, #f0f6fc, #c9d1d9);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
-    /* Sidebar Customization with Sleek Dark Glass */
+    /* Sidebar Customization */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0f172a 0%, #090d16 100%);
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(10px);
+        background: linear-gradient(180deg, #131722 0%, #0b0e14 100%);
+        border-right: 1px solid rgba(42, 46, 57, 0.8);
+        box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
     }
+    
     section[data-testid="stSidebar"] .block-container {
         padding-top: 2.5rem;
     }
 
-    /* Headers with Accent Glow */
+    /* Headers */
     h1, h2, h3 {
-        color: #f8fafc;
+        color: #f0f6fc;
         font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 800;
         letter-spacing: -0.02em;
     }
+
+    /* Interactive Elements & Buttons Styling */
+    .stButton>button {
+        background: linear-gradient(135deg, #089981 0%, #066c5b 100%);
+        color: white;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
     
-    /* Custom Scrollbar for sleek UI */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #0b0f19;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #1e293b;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #334155;
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(8, 153, 129, 0.4);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -129,7 +133,7 @@ def load_fno_symbols():
         "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO_ALL_LIST.txt",
         "https://raw.githubusercontent.com/meokgmblog/STRIKES-POSITION-BUILDER/main/FNO%20all%20list.txt"
     ]
-    
+
     for url in github_urls:
         try:
             res = requests.get(url, timeout=5)
@@ -366,7 +370,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER (TRADINGVIEW THEME)
+# STACKED SUBPLOTS CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -410,7 +414,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis) - Standard TradingView Aesthetic
+    # 2. Candlestick Price Trace (Y1 Axis) - Disabled Hover Info (TradingView Standard Candles)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -432,13 +436,13 @@ def render_chart(df, symbol, expiry_str):
     fig.update_layout(
         title=dict(
             text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
-            font=dict(size=14, color="#f1f5f9", family="Plus Jakarta Sans"),
+            font=dict(size=14, color="#d1d4dc", family="Plus Jakarta Sans"),
             x=0.01,
             y=0.98,
         ),
         template="plotly_dark",
-        paper_bgcolor="#0b0f19",
-        plot_bgcolor="#0f172a",
+        paper_bgcolor="#161b22",
+        plot_bgcolor="#161b22",
         height=480,
         margin=dict(l=20, r=20, t=45, b=40),
         showlegend=False,
@@ -452,10 +456,10 @@ def render_chart(df, symbol, expiry_str):
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
-            spikecolor="#38bdf8",
+            spikecolor="#ffffff",
             spikethickness=1,
             spikedash="dash",
-            gridcolor="#1e293b",
+            gridcolor="#2a2e39",
             rangebreaks=[dict(bounds=["sat", "mon"])],
             rangeslider=dict(visible=False),
         ),
@@ -466,10 +470,10 @@ def render_chart(df, symbol, expiry_str):
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
-            spikecolor="#38bdf8",
+            spikecolor="#ffffff",
             spikethickness=1,
             spikedash="dash",
-            gridcolor="#1e293b",
+            gridcolor="#2a2e39",
             side="right",
         ),
         # Secondary Y-Axis (Histogram Floor)
@@ -481,8 +485,8 @@ def render_chart(df, symbol, expiry_str):
             showgrid=False,
             showticklabels=False,
             zeroline=True,
-            zerolinecolor="#334155",
-            zerolinewidth=1.5,
+            zerolinecolor="#363a45",
+            zerolinewidth=1,
         ),
     )
 
@@ -542,7 +546,7 @@ try:
 
         builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
         exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
-        
+
         # UI Metrics Panel Display before Rendering Chart
         col1, col2, col3, col4 = st.columns(4)
         with col1:
