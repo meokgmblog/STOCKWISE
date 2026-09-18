@@ -367,7 +367,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis) - Disabled Hover Info
+    # 2. Standard Candlestick Price Trace (Y1 Axis) - Disabled Hover Info
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -429,12 +429,13 @@ def render_chart(df, symbol, expiry_str):
             gridcolor="#2a2e39",
             side="right",
         ),
-        # Secondary Y-Axis (Histogram Floor)
+        # Secondary Y-Axis (Histogram Floor) - Fixed range & fixedrange enabled to prevent zoom disappearance
         yaxis2=dict(
             title="",
             overlaying="y",
             side="left",
-            range=[-110, 480],
+            range=[-120, 120],
+            fixedrange=True,
             showgrid=False,
             showticklabels=False,
             zeroline=True,
