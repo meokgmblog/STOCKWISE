@@ -16,48 +16,23 @@ import streamlit as st
 # ================================================================
 # CONFIGURATION & PAGE SETUP
 # ================================================================
-st.set_page_config(
-    page_title="F&O Live Position Builder", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="F&O Live Position Builder", layout="wide")
 
-# Custom Premium Dark Theme CSS Styling
+# Custom CSS for Premium UI & Mobile Responsiveness
 st.markdown("""
     <style>
-    /* Main Background & Font */
-    .stApp {
-        background-color: #0b0e14;
-        color: #d1d4dc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
-    
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #131722;
-        border-right: 1px solid #2a2e39;
+    stButton>button {
+        width: 100%;
     }
-    section[data-testid="stSidebar"] .block-container {
-        padding-top: 2rem;
+    div[data-testid="stHorizontalBlock"] > div {
+        align-items: center;
     }
-
-    /* Metric & Headers */
-    h1, h2, h3 {
-        color: #f8f9fa !important;
-        font-weight: 600;
-    }
-    
-    /* Inputs & Selectboxes */
-    .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e222d;
-        border-color: #2a2e39;
-        color: #d1d4dc;
-    }
-    
-    /* Hide Streamlit Branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -66,7 +41,7 @@ MARKET_START = "09:00"
 MARKET_END = "15:45"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiJ2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
 
@@ -307,7 +282,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER (TradingView Mobile Optimized)
+# STACKED SUBPLOTS CHART RENDERER (MOBILE & PREMIUM OPTIMIZED)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -320,16 +295,35 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    # Create cleanly partitioned subplots (Row 1: Candlestick, Row 2: Position Builder Histogram)
+    # Create subplots with 2 rows sharing X-axis securely (prevents mobile zoom/autoscale merging issues)
     fig = make_subplots(
-        rows=2, 
-        cols=1, 
-        shared_xaxes=True, 
-        vertical_spacing=0.03, 
-        row_heights=[0.72, 0.28]
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+        row_heights=[0.7, 0.3]
     )
 
-    # 1. Candlestick Price Trace (Row 1)
+    # Custom date-time string formatting for the tooltip
+    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    # 1. Position Builder Histogram Trace (Row 2)
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            customdata=formatted_times,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.85,
+            hovertemplate="%{customdata}<extra></extra>",
+        ),
+        row=2, col=1
+    )
+
+    # 2. Candlestick Price Trace (Row 1)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -348,80 +342,68 @@ def render_chart(df, symbol, expiry_str):
         row=1, col=1
     )
 
-    # 2. Position Builder Histogram Trace (Row 2)
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            customdata=formatted_times,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.85,
-            hovertemplate="%{customdata}<extra></extra>",
-        ),
-        row=2, col=1
-    )
-
     fig.update_layout(
         title=dict(
             text=f"<b>{symbol} Spot</b> (3m) | Last: {last_price:.2f} | Updated: {last_time} IST | {expiry_str}",
             font=dict(size=13, color="#d1d4dc"),
             x=0.01,
-            y=0.98,
+            y=0.97,
         ),
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
         height=520,
-        margin=dict(l=10, r=10, t=40, b=30),
+        margin=dict(l=10, r=10, t=40, b=20),
         showlegend=False,
-        hovermode="x unified",
+        hovermode="x",
         dragmode="pan",
-        xaxis=dict(
-            type="date",
-            range=xaxis_range,
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#787b86",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#1e222d",
-            rangebreaks=[dict(bounds=["sat", "mon"])],
-            rangeslider=dict(visible=False),
-        ),
-        xaxis2=dict(
-            type="date",
-            range=xaxis_range,
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikecolor="#787b86",
-            spikethickness=1,
-            spikedash="dash",
-            gridcolor="#1e222d",
-            rangeslider=dict(visible=False),
-        ),
-        yaxis=dict(
-            title="Price",
-            side="right",
-            gridcolor="#1e222d",
-            zerolinecolor="#2a2e39",
-        ),
-        yaxis2=dict(
-            title="Net OI",
-            side="right",
-            range=[-110, 110],
-            gridcolor="#1e222d",
-            zeroline=True,
-            zerolinecolor="#363a45",
-            zerolinewidth=1,
-        )
+    )
+
+    # X-Axis configuration (Row 2 bottom)
+    fig.update_xaxes(
+        range=xaxis_range,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+        rangebreaks=[dict(bounds=["sat", "mon"])],
+        rangeslider=dict(visible=False),
+        row=2, col=1
+    )
+
+    fig.update_xaxes(
+        showticklabels=False,
+        gridcolor="#2a2e39",
+        row=1, col=1
+    )
+
+    # Primary Y-Axis (Candlesticks Upper Pane)
+    fig.update_yaxes(
+        title="Price",
+        side="right",
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor="#ffffff",
+        spikethickness=1,
+        spikedash="dash",
+        gridcolor="#2a2e39",
+        row=1, col=1
+    )
+
+    # Secondary Y-Axis (Histogram Lower Pane)
+    fig.update_yaxes(
+        title="",
+        range=[-110, 480],
+        showgrid=False,
+        showticklabels=False,
+        zeroline=True,
+        zerolinecolor="#363a45",
+        zerolinewidth=1,
+        row=2, col=1
     )
 
     config = {
@@ -429,7 +411,7 @@ def render_chart(df, symbol, expiry_str):
         "displayModeBar": True,
         "modeBarButtonsToAdd": ["pan2d"],
         "displaylogo": False,
-        "responsive": True
+        "responsive": True,
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
