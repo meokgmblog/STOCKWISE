@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 
@@ -264,7 +263,7 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# UNIFIED SINGLE-CANVAS CHART RENDERER (MOBILE & DESKTOP OPTIMIZED)
+# UNIFIED SINGLE-CANVAS CHART RENDERER (TRADINGVIEW STYLE)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
@@ -306,7 +305,7 @@ def render_chart(df, symbol, expiry_str):
         )
     )
 
-    # 2. Candlestick Price Trace (Y1 Axis - Upper Domain)
+    # 2. TradingView Style Regular Candlestick Price Trace (Y1 Axis - Upper Domain)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -315,11 +314,12 @@ def render_chart(df, symbol, expiry_str):
             low=df["low"],
             close=df["close"],
             name=symbol,
-            increasing_fillcolor="#089981",
             increasing_line_color="#089981",
-            decreasing_fillcolor="#f23645",
+            increasing_fillcolor="#089981",
             decreasing_line_color="#f23645",
-            whiskerwidth=0.4,
+            decreasing_fillcolor="#f23645",
+            line=dict(width=1),
+            whiskerwidth=1,
             yaxis="y1",
             hoverinfo="none",
         )
