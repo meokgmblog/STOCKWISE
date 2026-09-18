@@ -9,20 +9,74 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 
 # ================================================================
 # CONFIGURATION & PAGE SETUP
 # ================================================================
-st.set_page_config(page_title="F&O Live Position Builder", layout="wide")
+st.set_page_config(
+    page_title="F&O Live Position Builder",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom Modern UI Styling Injection
+st.markdown("""
+<style>
+    /* Global Theme & Font Enhancements */
+    .stApp {
+        background-color: #0e1117;
+        color: #d1d4dc;
+    }
+    
+    /* Metric Cards Styling */
+    .metric-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .metric-title {
+        font-size: 0.85rem;
+        color: #8b949e;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+    .metric-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #f0f6fc;
+    }
+
+    /* Sidebar Customization */
+    section[data-testid="stSidebar"] {
+        background-color: #131722;
+        border-right: 1px solid #2a2e39;
+    }
+    section[data-testid="stSidebar"] .block-container {
+        padding-top: 2rem;
+    }
+
+    /* Headers */
+    h1, h2, h3 {
+        color: #f0f6fc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 IST = ZoneInfo("Asia/Kolkata")
 MARKET_START = "09:00"
 MARKET_END = "15:45"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiJ2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
 
@@ -63,19 +117,27 @@ def load_fno_symbols():
 
 fno_symbol_list = load_fno_symbols()
 
-# Sidebar Controls
-st.sidebar.title("⚙️ Controls & Parameters")
+# ================================================================
+# SIDEBAR CONTROLS
+# ================================================================
+st.sidebar.markdown("### 📊 Command Center")
+st.sidebar.markdown("Configure your live market feed parameters below.")
 
 default_index = fno_symbol_list.index("NIFTY") if "NIFTY" in fno_symbol_list else 0
 SYMBOL_INPUT = st.sidebar.selectbox(
-    "F&O Symbol",
+    "Select F&O Symbol",
     options=fno_symbol_list,
     index=default_index
 ).strip().upper()
 
 NUM_STRIKES_BOUND = st.sidebar.slider("Strikes Range (± ATM)", min_value=2, max_value=12, value=2)
 
-st.title(f"📈 {SYMBOL_INPUT} - Live 3-Minute Position Builder")
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Pro Tip:** Use mouse drag on the chart to pan across sessions or scroll to zoom in.")
+
+# Main Dashboard Title Header
+st.markdown(f"## 📈 {SYMBOL_INPUT} Live Position Builder")
+st.markdown("Real-time intraday open interest dynamics mapped directly against spot price action.")
 
 # ================================================================
 # API HELPERS & MASTER FETCHERS
@@ -263,18 +325,18 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# UNIFIED SINGLE-CANVAS CHART RENDERER
+# STACKED SUBPLOTS CHART RENDERER
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
 
-    # Calculate price extremes
+    # Calculate price extremes to keep candles in the top ~75% of the canvas
     price_min = df["low"].min()
     price_max = df["high"].max()
     price_span = price_max - price_min if price_max != price_min else 1.0
 
-    y1_min = price_min - (price_span * 0.1)
+    y1_min = price_min - (price_span * 0.35)
     y1_max = price_max + (price_span * 0.05)
 
     # Fixed intraday range from 09:00 to 15:45 for the current session date
@@ -286,24 +348,28 @@ def render_chart(df, symbol, expiry_str):
 
     fig = go.Figure()
 
-    # 1. Position Builder Histogram Trace (Y2 Axis - Bottom Domain) - hoverinfo="none" removes upper date popup
+    # 1. Position Builder Histogram Trace (Y2 Axis - Shifted to Bottom)
     values = df["position_builder_scaled"].fillna(0)
     colors = ["#089981" if v >= 0 else "#f23645" for v in values]
+
+    # Custom date-time string formatting for the tooltip
+    formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
 
     fig.add_trace(
         go.Bar(
             x=df["timestamp"],
             y=values,
+            customdata=formatted_times,
             name="Net OI Scaled",
             marker_color=colors,
             marker_line_width=0,
-            opacity=0.85,
+            opacity=0.7,
             yaxis="y2",
-            hoverinfo="none",
+            hovertemplate="%{customdata}<extra></extra>",  # Shows ONLY the Date and Time
         )
     )
 
-    # 2. TradingView Standard Solid Candlestick Price Trace (Y1 Axis - Upper Domain)
+    # 2. Candlestick Price Trace (Y1 Axis) - Disabled Hover Info
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -312,12 +378,13 @@ def render_chart(df, symbol, expiry_str):
             low=df["low"],
             close=df["close"],
             name=symbol,
-            increasing_line_color="#089981",
             increasing_fillcolor="#089981",
-            decreasing_line_color="#f23645",
+            increasing_line_color="#089981",
             decreasing_fillcolor="#f23645",
+            decreasing_line_color="#f23645",
+            whiskerwidth=0.4,
             yaxis="y1",
-            hoverinfo="none",
+            hoverinfo="none",  # Hides candlestick OHLC values from tooltip
         )
     )
 
@@ -329,18 +396,18 @@ def render_chart(df, symbol, expiry_str):
             y=0.98,
         ),
         template="plotly_dark",
-        paper_bgcolor="#131722",
-        plot_bgcolor="#131722",
+        paper_bgcolor="#161b22",
+        plot_bgcolor="#161b22",
         height=480,
-        margin=dict(l=10, r=20, t=45, b=30),
+        margin=dict(l=20, r=20, t=45, b=40),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-        # Unified X-Axis placed at the bottom
+        # Unified X-Axis placed at the bottom below histogram with fixed session range
         xaxis=dict(
             type="date",
             range=xaxis_range,
-            side="bottom",
+            side="bottom",  # Forces time labels to the very bottom
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
@@ -351,10 +418,9 @@ def render_chart(df, symbol, expiry_str):
             rangebreaks=[dict(bounds=["sat", "mon"])],
             rangeslider=dict(visible=False),
         ),
-        # Primary Y-Axis (Candlesticks Upper Domain 72%)
+        # Primary Y-Axis (Candlesticks Upper Canvas)
         yaxis=dict(
             title="Price",
-            domain=[0.28, 1.0],
             range=[y1_min, y1_max],
             showspikes=True,
             spikemode="across",
@@ -365,26 +431,25 @@ def render_chart(df, symbol, expiry_str):
             gridcolor="#2a2e39",
             side="right",
         ),
-        # Secondary Y-Axis (Histogram Lower Domain 22%)
+        # Secondary Y-Axis (Histogram Floor)
         yaxis2=dict(
             title="",
-            domain=[0.0, 0.22],
+            overlaying="y",
+            side="left",
             range=[-110, 480],
             showgrid=False,
             showticklabels=False,
             zeroline=True,
             zerolinecolor="#363a45",
             zerolinewidth=1,
-            side="left",
         ),
     )
 
     config = {
         "scrollZoom": True,
         "displayModeBar": True,
-        "modeBarButtonsToAdd": ["pan2d", "zoom2d"],
+        "modeBarButtonsToAdd": ["pan2d"],
         "displaylogo": False,
-        "responsive": True,
     }
 
     st.plotly_chart(fig, use_container_width=True, config=config)
@@ -436,6 +501,18 @@ try:
         builder_df = calculate_position_builder(spot_df, ce_df, pe_df)
         exp_date_str = opts_df.iloc[0]["expiry_dt"].strftime("%b-%d")
         
+        # UI Metrics Panel Display before Rendering Chart
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric(label="Spot Price", value=f"{last_close:.2f}")
+        with col2:
+            st.metric(label="ATM Strike", value=f"{atm_strike:.0f}")
+        with col3:
+            st.metric(label="Expiry Date", value=exp_date_str)
+        with col4:
+            net_val = builder_df["position_builder_scaled"].iloc[-1]
+            st.metric(label="Net OI Momentum", value=f"{net_val:.1f}%")
+
         render_chart(builder_df, SYMBOL_INPUT, f"Expiry: {exp_date_str}")
     else:
         st.error("Failed to fetch concurrent open interest data for strikes.")
