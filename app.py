@@ -31,27 +31,25 @@ st.markdown("""
         color: #d1d4dc;
     }
     
-    /* Metric Cards Styling */
-    .metric-card {
+    /* Native Streamlit Metric Cards Customization */
+    [data-testid="stMetric"] {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 8px;
         padding: 16px;
-        text-align: center;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    .metric-title {
-        font-size: 0.85rem;
-        color: #8b949e;
+    [data-testid="stMetricLabel"] {
+        font-size: 0.85rem !important;
+        color: #8b949e !important;
         text-transform: uppercase;
         font-weight: 600;
         letter-spacing: 0.05em;
-        margin-bottom: 4px;
     }
-    .metric-value {
-        font-size: 1.4rem;
+    [data-testid="stMetricValue"] {
+        font-size: 1.4rem !important;
         font-weight: 700;
-        color: #f0f6fc;
+        color: #f0f6fc !important;
     }
 
     /* Sidebar Customization */
@@ -449,6 +447,7 @@ def render_chart(df, symbol, expiry_str):
         "scrollZoom": True,
         "displayModeBar": True,
         "modeBarButtonsToAdd": ["pan2d"],
+        "modeBarButtonsToRemove": ["autoscale2d"],  # Prevents autoscale layout breaking
         "displaylogo": False,
     }
 
