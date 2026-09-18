@@ -23,7 +23,7 @@ MARKET_START = "09:00"
 MARKET_END = "15:45"
 INTERVAL = 3
 
-ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiI2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
+ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI2M0FZSEUiLCJqdGkiOiJ2YThkNTc1Y2Y4MTJmNjA0MzcxZDNlM2MiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc4NzY0NzgzNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzg3Njk1MjAwfQ.Z4zP9w3MecFeZEcX5sUt4YdhxS6skp25fbKOv8-_gPU"
 
 MAJOR_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "SENSEX"]
 
@@ -264,11 +264,19 @@ def calculate_position_builder(price_df, ce_df, pe_df):
     return df
 
 # ================================================================
-# STACKED SUBPLOTS CHART RENDERER (MOBILE & DESKTOP OPTIMIZED)
+# UNIFIED SINGLE-CANVAS CHART RENDERER (MOBILE & DESKTOP OPTIMIZED)
 # ================================================================
 def render_chart(df, symbol, expiry_str):
     last_price = df["close"].iloc[-1]
     last_time = df["timestamp"].iloc[-1].strftime("%H:%M:%S")
+
+    # Calculate price extremes
+    price_min = df["low"].min()
+    price_max = df["high"].max()
+    price_span = price_max - price_min if price_max != price_min else 1.0
+
+    y1_min = price_min - (price_span * 0.1)
+    y1_max = price_max + (price_span * 0.05)
 
     # Fixed intraday range from 09:00 to 15:45 for the current session date
     current_date = df["timestamp"].dt.date.iloc[-1]
@@ -277,19 +285,28 @@ def render_chart(df, symbol, expiry_str):
         pd.Timestamp(f"{current_date} {MARKET_END}:00")
     ]
 
-    # Create subplots with independent axes to avoid mobile zooming/autoscale overlap issues
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        shared_xaxes=True,
-        vertical_spacing=0.04,
-        row_heights=[0.72, 0.28]
-    )
+    fig = go.Figure()
 
-    # Custom date-time string formatting for the tooltip
+    # 1. Position Builder Histogram Trace (Y2 Axis - Bottom Domain)
+    values = df["position_builder_scaled"].fillna(0)
+    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
     formatted_times = df["timestamp"].dt.strftime("%B %d, %Y at %I:%M %p")
 
-    # 1. Candlestick Price Trace (Row 1)
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=values,
+            customdata=formatted_times,
+            name="Net OI Scaled",
+            marker_color=colors,
+            marker_line_width=0,
+            opacity=0.85,
+            yaxis="y2",
+            hovertemplate="%{customdata}<extra></extra>",
+        )
+    )
+
+    # 2. Candlestick Price Trace (Y1 Axis - Upper Domain)
     fig.add_trace(
         go.Candlestick(
             x=df["timestamp"],
@@ -303,27 +320,9 @@ def render_chart(df, symbol, expiry_str):
             decreasing_fillcolor="#f23645",
             decreasing_line_color="#f23645",
             whiskerwidth=0.4,
+            yaxis="y1",
             hoverinfo="none",
-        ),
-        row=1, col=1
-    )
-
-    # 2. Position Builder Histogram Trace (Row 2)
-    values = df["position_builder_scaled"].fillna(0)
-    colors = ["#089981" if v >= 0 else "#f23645" for v in values]
-
-    fig.add_trace(
-        go.Bar(
-            x=df["timestamp"],
-            y=values,
-            customdata=formatted_times,
-            name="Net OI Scaled",
-            marker_color=colors,
-            marker_line_width=0,
-            opacity=0.85,
-            hovertemplate="%{customdata}<extra></extra>",
-        ),
-        row=2, col=1
+        )
     )
 
     fig.update_layout(
@@ -336,54 +335,52 @@ def render_chart(df, symbol, expiry_str):
         template="plotly_dark",
         paper_bgcolor="#131722",
         plot_bgcolor="#131722",
-        height=500,
-        margin=dict(l=10, r=10, t=45, b=20),
+        height=480,
+        margin=dict(l=10, r=20, t=45, b=30),
         showlegend=False,
         hovermode="x",
         dragmode="pan",
-    )
-
-    # Shared X-Axis Configuration with Crosshairs
-    fig.update_xaxes(
-        type="date",
-        range=xaxis_range,
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        rangebreaks=[dict(bounds=["sat", "mon"])],
-        rangeslider=dict(visible=False),
-        row=2, col=1
-    )
-
-    # Primary Y-Axis (Candlesticks Upper Panel)
-    fig.update_yaxes(
-        title_text="Price",
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikecolor="#ffffff",
-        spikethickness=1,
-        spikedash="dash",
-        gridcolor="#2a2e39",
-        side="right",
-        row=1, col=1
-    )
-
-    # Secondary Y-Axis (Histogram Lower Panel)
-    fig.update_yaxes(
-        title_text="",
-        range=[-110, 480],
-        showgrid=False,
-        showticklabels=False,
-        zeroline=True,
-        zerolinecolor="#363a45",
-        zerolinewidth=1,
-        side="right",
-        row=2, col=1
+        # Unified X-Axis placed at the bottom
+        xaxis=dict(
+            type="date",
+            range=xaxis_range,
+            side="bottom",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            rangebreaks=[dict(bounds=["sat", "mon"])],
+            rangeslider=dict(visible=False),
+        ),
+        # Primary Y-Axis (Candlesticks Upper Domain 72%)
+        yaxis=dict(
+            title="Price",
+            domain=[0.28, 1.0],
+            range=[y1_min, y1_max],
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor="#ffffff",
+            spikethickness=1,
+            spikedash="dash",
+            gridcolor="#2a2e39",
+            side="right",
+        ),
+        # Secondary Y-Axis (Histogram Lower Domain 22%)
+        yaxis2=dict(
+            title="",
+            domain=[0.0, 0.22],
+            range=[-110, 480],
+            showgrid=False,
+            showticklabels=False,
+            zeroline=True,
+            zerolinecolor="#363a45",
+            zerolinewidth=1,
+            side="left",
+        ),
     )
 
     config = {
